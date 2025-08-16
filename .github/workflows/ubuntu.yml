@@ -1,0 +1,37 @@
+name: ubuntu
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and install m68k-xelf
+        env:
+          TARBALL_URL: https://github.com/yunkya2/elf2x68k/releases/download/20240929/elf2x68k-Linux-20240929.tar.bz2
+        run: |
+          set -euo pipefail
+          wd="$RUNNER_TEMP/m68k-xelf"; rm -rf "$wd"; mkdir -p "$wd"; cd "$wd"
+          curl -fL "$TARBALL_URL" -o t.tar.bz2
+          top="$(tar -tf t.tar.bz2 | sed -n '1{s#/.*##;p}')" && tar -xf t.tar.bz2
+          bin="$(find "$top" -maxdepth 3 -type f -name m68k-xelf-gcc -printf '%h\n' -quit)"; [ -n "$bin" ] || bin="$(find "$top" -maxdepth 3 -type d -name bin | head -n1)"; [ -n "$bin" ]
+          compgen -G "$bin/*" >/dev/null && chmod +x "$bin/"* || true
+          echo "$(readlink -f "$bin" || realpath "$bin")" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          cd src
+          make -j
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: my-artifact
+          path: src/*.x
