@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
   int usp = _iocs_b_super(0);
   printf("           MZYXSCBARLDU\n");
   printf("------------------------\n");
-  while(1){
+  while(!_iocs_bitsns(0x01)){ // ESC
     mdpad_port_t  port  = MDPAD_PORT_A;
     mdpad_type_t  type  = mdpad_detect(port);
     mdpad_state_t state = (type == MDPAD_MD6) ? mdpad_read6(port)
