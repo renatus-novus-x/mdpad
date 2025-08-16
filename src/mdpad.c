@@ -17,6 +17,7 @@ void mdpad_bits_to_binary(uint16_t bits, char out[13]) {
 }
 int main(int argc, char* argv[]) {
   int usp = _iocs_b_super(0);
+  printf("MD pad state / ESC:exit\n");
   printf("           MZYXSCBARLDU\n");
   printf("------------------------\n");
   while(!(_iocs_bitsns(0) & (1 << 1))){ // ESC: group0-bit1
