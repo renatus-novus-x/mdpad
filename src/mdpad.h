@@ -131,10 +131,10 @@ static inline mdpad_state_t mdpad_read3(mdpad_port_t port) {
   if (s_hi & (1u << 1)) st.bits |= MDPAD_DOWN;
   if (s_hi & (1u << 2)) st.bits |= MDPAD_LEFT;
   if (s_hi & (1u << 3)) st.bits |= MDPAD_RIGHT;
-  if (s_hi & (1u << 4)) st.bits |= MDPAD_B;    /* Buttons: TH=1 -> B,C ; TH=0 -> A,START */
-  if (s_hi & (1u << 5)) st.bits |= MDPAD_C;
-  if (s_lo & (1u << 4)) st.bits |= MDPAD_A;
-  if (s_lo & (1u << 5)) st.bits |= MDPAD_START;
+  if (s_hi & (1u << 5)) st.bits |= MDPAD_B;
+  if (s_hi & (1u << 6)) st.bits |= MDPAD_C;
+  if (s_lo & (1u << 5)) st.bits |= MDPAD_A;
+  if (s_lo & (1u << 6)) st.bits |= MDPAD_START;
 
   return st;
 }
