@@ -1,4 +1,4 @@
-TARGET = mdpad.x
+TARGET = mdpad_demo.x
 
 CROSS = m68k-xelf-
 CC = $(CROSS)gcc
@@ -10,7 +10,7 @@ LDFLAGS =
 
 all: $(TARGET)
 
-$(TARGET): mdpad.o
+$(TARGET): mdpad_demo.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 %.o: %.c
