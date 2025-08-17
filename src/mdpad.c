@@ -3,6 +3,19 @@
 
 #include "mdpad.h"
 
+#define VSTAT (*(volatile unsigned char*)0xE88001) // GPDR
+#define VBIT  (0x10)
+
+void wait_vblank_start(void) {
+  while (  VSTAT & VBIT) {}
+  while (!(VSTAT & VBIT)){}
+}
+
+void wait_vblank_end(void) {
+  while (!(VSTAT & VBIT)){}
+  while (  VSTAT & VBIT) {}
+}
+
 const char* PORT_STRING[] = { "#1", "#2"};
 const char* PAD_STRING[]  = { "  2B", "MD3B", "MD6B" };
 
@@ -21,6 +34,7 @@ int main(int argc, char* argv[]) {
   printf("           MZYXSCBARLDU\n");
   printf("------------------------\n");
   while(!(_iocs_bitsns(0) & (1 << 1))){ // ESC: group0-bit1
+    wait_vblank_start();
     mdpad_port_t  port  = MDPAD_PORT_A;
     mdpad_type_t  type  = mdpad_detect(port);
     mdpad_state_t state = (type == MDPAD_MD6) ? mdpad_read6(port)
@@ -28,6 +42,7 @@ int main(int argc, char* argv[]) {
     char bin[13];
     mdpad_bits_to_binary(state.bits, bin);
     printf("\r[%s][%s][%s]        ", PORT_STRING[port], PAD_STRING[(int)type], bin);
+    wait_vblank_end();
   }
   printf("\n");
   _iocs_b_super(usp);
