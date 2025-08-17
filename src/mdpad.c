@@ -4,7 +4,7 @@
 #include "mdpad.h"
 
 #define VSTAT (*(volatile unsigned char*)0xE88001) // GPDR
-#define VBIT  (0x10)
+#define VBIT  (0b00010000)                         // bit4 = V-DISP
 
 void wait_vblank_start(void) {
   while (  VSTAT & VBIT) {}
