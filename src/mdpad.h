@@ -27,6 +27,22 @@ extern "C" {
 typedef enum { MDPAD_PORT_A = 0, MDPAD_PORT_B = 1 } mdpad_port_t;
 typedef enum { MDPAD_ATARI = 0, MDPAD_MD3 = 1, MDPAD_MD6 = 2 } mdpad_type_t;
 
+#define MDPAD_STABLE_READS      (4)
+#define MDPAD_STABLE_MAX_ITERS (64)
+
+static inline uint8_t __mdpad_read_stable(volatile uint8_t* rd) {
+  uint8_t prev = *rd, cur;
+  int stable = 0, tries = 0;
+  do {
+    cur = *rd;
+    stable = (cur == prev) ? (stable + 1) : 0;
+    prev = cur;
+  } while (stable < MDPAD_STABLE_READS && ++tries < MDPAD_STABLE_MAX_ITERS);
+  return cur; /* raw (active-low) */
+}
+
+static inline void __mdpad_barrier(void){ __asm__ volatile("" ::: "memory"); }
+
 /* Normalized bit masks (pressed = 1) */
 enum {
   MDPAD_UP    = 1u << 0,
@@ -71,36 +87,25 @@ static inline uint8_t __mdpad_bsr_high(mdpad_port_t p) {
 
 /* ---- Detect pad type  ---- */
 static inline mdpad_type_t mdpad_detect(mdpad_port_t port) {
-  volatile uint8_t* rd = __mdpad_data_ptr(port);
-  volatile uint8_t* pc = (volatile uint8_t*)MDPAD_IO_PC;
-  uint8_t low  = __mdpad_bsr_low(port);
-  uint8_t high = __mdpad_bsr_high(port);
-  uint8_t id;
+  volatile uint8_t* rd = __mdpad_data_ptr(port);       /* $E9A001 or $E9A003 */
+  volatile uint8_t* pc = (volatile uint8_t*)MDPAD_IO_PC; /* $E9A007 */
+  const uint8_t low  = __mdpad_bsr_low(port);          /* A:#8 / B:#0A */
+  const uint8_t high = __mdpad_bsr_high(port);         /* A:#9 / B:#0B */
 
-  __asm__ volatile(
-    " move.b %[lo], %[PC] \n\t"
-    " move.b %[RD], %0    \n\t"
-    " move.b %[hi], %[PC] \n\t"
-    " move.b %[RD], %0    \n\t"
-    " move.b %[lo], %[PC] \n\t"
-    " move.b %[RD], %0    \n\t"
-    " move.b %[hi], %[PC] \n\t"
-    " move.b %[RD], %0    \n\t"
-    " move.b %[lo], %[PC] \n\t"
-    " move.b %[RD], %0    \n\t"
-    " not.b   %0          \n\t"
-    " andi.b  #0x0F,%0    \n\t"
-    : "=&d"(id)
-    : [RD] "m" (*(volatile uint8_t*)rd),
-      [PC] "m" (*(volatile uint8_t*)pc),
-      [lo] "d"(low),
-      [hi] "d"(high)
-    : "cc", "memory"
-  );
+  uint8_t d;
 
-  if (id == 0x0F) return MDPAD_MD6;
-  if ((id & 0x0C) == 0x0C) return MDPAD_MD3;
-  return MDPAD_ATARI;
+  *pc = low;  __mdpad_barrier(); d = __mdpad_read_stable(rd);
+  *pc = high; __mdpad_barrier(); d = __mdpad_read_stable(rd);
+  *pc = low;  __mdpad_barrier(); d = __mdpad_read_stable(rd);
+  *pc = high; __mdpad_barrier(); d = __mdpad_read_stable(rd);
+  *pc = low;  __mdpad_barrier(); d = __mdpad_read_stable(rd);  /* final */
+
+  d ^= 0xFF;                 /* active-low ¨ active-high */
+  uint8_t id = (uint8_t)(d & 0x0F);   /* use low nibble */
+
+  if (id == 0x0F)                 return MDPAD_MD6;   /* 6-button */
+  if ((id & 0x0C) == 0x0C)        return MDPAD_MD3;   /* 3-button */
+  return MDPAD_ATARI;                                   /* fallback */
 }
 
 /* ---- 3-button read: return normalized mdpad_state_t ----
@@ -110,37 +115,23 @@ static inline mdpad_type_t mdpad_detect(mdpad_port_t port) {
 static inline mdpad_state_t mdpad_read3(mdpad_port_t port) {
   volatile uint8_t* rd = __mdpad_data_ptr(port);
   volatile uint8_t* pc = (volatile uint8_t*)MDPAD_IO_PC;
-  uint8_t low  = __mdpad_bsr_low(port);
-  uint8_t high = __mdpad_bsr_high(port);
+  const uint8_t low  = __mdpad_bsr_low(port);
+  const uint8_t high = __mdpad_bsr_high(port);
 
-  uint8_t s_hi, s_lo; /* raw bus data (will invert in C) */
+  *pc = low;  __mdpad_barrier(); (void)*rd;                              /* dummy */
+  *pc = high; __mdpad_barrier(); uint8_t s_hi = __mdpad_read_stable(rd); /* TH=1 */
+  *pc = low;  __mdpad_barrier(); uint8_t s_lo = __mdpad_read_stable(rd); /* TH=0 */
 
-  __asm__ volatile(
-    " move.b %[lo], %[PC] \n\t"  /* TH=0 (dummy sync) */
-    " move.b %[RD], %0    \n\t"  /* dummy read */
-    " move.b %[hi], %[PC] \n\t"  /* TH=1 */
-    " move.b %[RD], %0    \n\t"  /* s_hi */
-    " move.b %[lo], %[PC] \n\t"  /* TH=0 */
-    " move.b %[RD], %1    \n\t"  /* s_lo */
-    : "=&d"(s_hi), "=&d"(s_lo)
-    : [RD] "m" (*(volatile uint8_t*)rd),
-      [PC] "m" (*(volatile uint8_t*)pc),
-      [lo] "d"(low),
-      [hi] "d"(high)
-    : "cc", "memory"
-  );
-
-  s_hi = (uint8_t)~s_hi; /* pressed=1 */
+  s_hi = (uint8_t)~s_hi;  /* active-low -> pressed=1 */
   s_lo = (uint8_t)~s_lo;
 
   mdpad_state_t st = {0};
-  /* Direction (bits 0..3 in both reads) */
-  if (s_hi & (1u << 0)) st.bits |= MDPAD_UP;
+
+  if (s_hi & (1u << 0)) st.bits |= MDPAD_UP;   /* Direction (bits 0..3 in both reads) */
   if (s_hi & (1u << 1)) st.bits |= MDPAD_DOWN;
   if (s_hi & (1u << 2)) st.bits |= MDPAD_LEFT;
   if (s_hi & (1u << 3)) st.bits |= MDPAD_RIGHT;
-  /* Buttons: TH=1 -> B,C ; TH=0 -> A,START */
-  if (s_hi & (1u << 4)) st.bits |= MDPAD_B;
+  if (s_hi & (1u << 4)) st.bits |= MDPAD_B;    /* Buttons: TH=1 -> B,C ; TH=0 -> A,START */
   if (s_hi & (1u << 5)) st.bits |= MDPAD_C;
   if (s_lo & (1u << 4)) st.bits |= MDPAD_A;
   if (s_lo & (1u << 5)) st.bits |= MDPAD_START;
@@ -156,33 +147,17 @@ static inline mdpad_state_t mdpad_read3(mdpad_port_t port) {
 static inline mdpad_raw6_t mdpad_read6_raw(mdpad_port_t port) {
   volatile uint8_t* rd = __mdpad_data_ptr(port);
   volatile uint8_t* pc = (volatile uint8_t*)MDPAD_IO_PC;
-  uint8_t low  = __mdpad_bsr_low(port);
-  uint8_t high = __mdpad_bsr_high(port);
-
-  uint8_t r0, r1, r2, r3, r4, r5;
-
-  __asm__ volatile(
-    " move.b %[lo], %[PC] \n\t"  " move.b %[RD], %0 \n\t"
-    " move.b %[hi], %[PC] \n\t"  " move.b %[RD], %1 \n\t"
-    " move.b %[lo], %[PC] \n\t"  " move.b %[RD], %2 \n\t"
-    " move.b %[hi], %[PC] \n\t"  " move.b %[RD], %3 \n\t"
-    " move.b %[lo], %[PC] \n\t"  " move.b %[RD], %4 \n\t"
-    " move.b %[hi], %[PC] \n\t"  " move.b %[RD], %5 \n\t"
-    : "=&d"(r0), "=&d"(r1), "=&d"(r2), "=&d"(r3), "=&d"(r4), "=&d"(r5)
-    : [RD] "m" (*(volatile uint8_t*)rd),
-      [PC] "m" (*(volatile uint8_t*)pc),
-      [lo] "d"(low),
-      [hi] "d"(high)
-    : "cc", "memory"
-  );
-
+  const uint8_t low  = __mdpad_bsr_low(port);
+  const uint8_t high = __mdpad_bsr_high(port);
   mdpad_raw6_t out;
-  out.raw[0] = (uint8_t)~r0;  /* normalize to pressed=1 */
-  out.raw[1] = (uint8_t)~r1;
-  out.raw[2] = (uint8_t)~r2;
-  out.raw[3] = (uint8_t)~r3;
-  out.raw[4] = (uint8_t)~r4;
-  out.raw[5] = (uint8_t)~r5;
+
+  *pc = low;  __mdpad_barrier(); out.raw[0] = (uint8_t)~__mdpad_read_stable(rd);
+  *pc = high; __mdpad_barrier(); out.raw[1] = (uint8_t)~__mdpad_read_stable(rd);
+  *pc = low;  __mdpad_barrier(); out.raw[2] = (uint8_t)~__mdpad_read_stable(rd);
+  *pc = high; __mdpad_barrier(); out.raw[3] = (uint8_t)~__mdpad_read_stable(rd);
+  *pc = low;  __mdpad_barrier(); out.raw[4] = (uint8_t)~__mdpad_read_stable(rd);
+  *pc = high; __mdpad_barrier(); out.raw[5] = (uint8_t)~__mdpad_read_stable(rd);
+
   return out;
 }
 
