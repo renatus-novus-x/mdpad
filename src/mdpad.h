@@ -131,9 +131,9 @@ static inline mdpad_state_t mdpad_read3(mdpad_port_t port) {
   if (s_hi & (1u << 1)) st.bits |= MDPAD_DOWN;
   if (s_hi & (1u << 2)) st.bits |= MDPAD_LEFT;
   if (s_hi & (1u << 3)) st.bits |= MDPAD_RIGHT;
-  if (s_hi & (1u << 5)) st.bits |= MDPAD_B;
+  if (s_hi & (1u << 5)) st.bits |= MDPAD_B;    /* TH=1:[B][C]     */
   if (s_hi & (1u << 6)) st.bits |= MDPAD_C;
-  if (s_lo & (1u << 5)) st.bits |= MDPAD_A;
+  if (s_lo & (1u << 5)) st.bits |= MDPAD_A;    /* TH=0:[A][START] */
   if (s_lo & (1u << 6)) st.bits |= MDPAD_START;
 
   return st;
@@ -175,22 +175,23 @@ static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
 
   mdpad_state_t st = {0};
   /* Directions (bits 0..3) */
-  if (th1 & (1u << 0)) st.bits |= MDPAD_UP;
-  if (th1 & (1u << 1)) st.bits |= MDPAD_DOWN;
-  if (th1 & (1u << 2)) st.bits |= MDPAD_LEFT;
-  if (th1 & (1u << 3)) st.bits |= MDPAD_RIGHT;
+  if (th1 & (1u << 0)) st.bits |= MDPAD_Z;
+  if (th1 & (1u << 1)) st.bits |= MDPAD_Y;
+  if (th1 & (1u << 2)) st.bits |= MDPAD_X;
+  if (th1 & (1u << 3)) st.bits |= MDPAD_MODE;
 
   /* 3-button set */
-  if (th1 & (1u << 4)) st.bits |= MDPAD_B;
-  if (th1 & (1u << 5)) st.bits |= MDPAD_C;
-  if (th0 & (1u << 4)) st.bits |= MDPAD_A;
-  if (th0 & (1u << 5)) st.bits |= MDPAD_START;
-
-  /* extended: Z,Y,X,MODE mapped onto D0..D3 at ext phase (active-high here) */
-  if (ext & (1u << 0)) st.bits |= MDPAD_Z;
-  if (ext & (1u << 1)) st.bits |= MDPAD_Y;
-  if (ext & (1u << 2)) st.bits |= MDPAD_X;
-  if (ext & (1u << 3)) st.bits |= MDPAD_MODE;
+  if (th1 & (1u << 5)) st.bits |= MDPAD_B;
+  if (th1 & (1u << 6)) st.bits |= MDPAD_C;
+  if (th0 & (1u << 5)) st.bits |= MDPAD_A;
+  if (th0 & (1u << 6)) st.bits |= MDPAD_START;
+//  if (th0 & (1u << 0)) st.bits |= MDPAD_LEFT;
+//  if (th0 & (1u << 1)) st.bits |= MDPAD_RIGHT;
+  /* Directions (bits 0..3) */
+  if (ext & (1u << 0)) st.bits |= MDPAD_UP;
+  if (ext & (1u << 1)) st.bits |= MDPAD_DOWN;
+//  if (ext & (1u << 2)) st.bits |= MDPAD_LEFT;
+//  if (ext & (1u << 3)) st.bits |= MDPAD_RIGHT;
 
   return st;
 }
