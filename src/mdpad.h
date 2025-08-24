@@ -169,32 +169,25 @@ static inline mdpad_raw6_t mdpad_read6_raw(mdpad_port_t port) {
  */
 static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
   mdpad_raw6_t s = mdpad_read6_raw(port);
-  const uint8_t th1 = s.raw[1]; /* TH=1 */
-  const uint8_t th0 = s.raw[0]; /* TH=0 */
-  const uint8_t ext = s.raw[4]; /* 3rd TH=0 -> extended */
-
-  mdpad_state_t st = {0};
-  /* Directions (bits 0..3) */
-  if (th1 & (1u << 0)) st.bits |= MDPAD_Z;
-  if (th1 & (1u << 1)) st.bits |= MDPAD_Y;
-  if (th1 & (1u << 2)) st.bits |= MDPAD_X;
-  if (th1 & (1u << 3)) st.bits |= MDPAD_MODE;
-
-  /* 3-button set */
-  if (th1 & (1u << 5)) st.bits |= MDPAD_B;
+  const uint8_t th1 = (uint8_t)(s.raw[1] | s.raw[3] | s.raw[5]);
+  const uint8_t th0 = (uint8_t)(s.raw[0] | s.raw[2]);
+  const uint8_t ext = s.raw[4];
+  mdpad_state_t st = (mdpad_state_t){0};
+  if (th1 & (1u << 0)) st.bits |= MDPAD_UP;
+  if (th1 & (1u << 1)) st.bits |= MDPAD_DOWN;
+  if (th1 & (1u << 2)) st.bits |= MDPAD_LEFT;
+  if (th1 & (1u << 3)) st.bits |= MDPAD_RIGHT;
+  if (th1 & (1u << 5)) st.bits |= MDPAD_B; // 3B
   if (th1 & (1u << 6)) st.bits |= MDPAD_C;
   if (th0 & (1u << 5)) st.bits |= MDPAD_A;
   if (th0 & (1u << 6)) st.bits |= MDPAD_START;
-//  if (th0 & (1u << 0)) st.bits |= MDPAD_LEFT;
-//  if (th0 & (1u << 1)) st.bits |= MDPAD_RIGHT;
-  /* Directions (bits 0..3) */
-  if (ext & (1u << 0)) st.bits |= MDPAD_UP;
-  if (ext & (1u << 1)) st.bits |= MDPAD_DOWN;
-//  if (ext & (1u << 2)) st.bits |= MDPAD_LEFT;
-//  if (ext & (1u << 3)) st.bits |= MDPAD_RIGHT;
-
+  if (ext & (1u << 0)) st.bits |= MDPAD_X; // 6B
+  if (ext & (1u << 1)) st.bits |= MDPAD_Y;
+  if (ext & (1u << 2)) st.bits |= MDPAD_Z;
+  if (ext & (1u << 3)) st.bits |= MDPAD_MODE;
   return st;
 }
+
 
 /* ---- Convenience: read-any (detect once per call) ---- */
 static inline mdpad_state_t mdpad_read(mdpad_port_t port) {
