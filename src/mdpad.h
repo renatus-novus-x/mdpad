@@ -150,14 +150,14 @@ static inline mdpad_raw6_t mdpad_read6_raw(mdpad_port_t port) {
   const uint8_t low  = __mdpad_bsr_low(port);
   const uint8_t high = __mdpad_bsr_high(port);
   mdpad_raw6_t out;
-
-  *pc = low;  __mdpad_barrier(); out.raw[0] = (uint8_t)~__mdpad_read_stable(rd);
-  *pc = high; __mdpad_barrier(); out.raw[1] = (uint8_t)~__mdpad_read_stable(rd);
-  *pc = low;  __mdpad_barrier(); out.raw[2] = (uint8_t)~__mdpad_read_stable(rd);
-  *pc = high; __mdpad_barrier(); out.raw[3] = (uint8_t)~__mdpad_read_stable(rd);
-  *pc = low;  __mdpad_barrier(); out.raw[4] = (uint8_t)~__mdpad_read_stable(rd);
-  *pc = high; __mdpad_barrier(); out.raw[5] = (uint8_t)~__mdpad_read_stable(rd);
-
+  *pc = high; __mdpad_barrier(); (void)__mdpad_read_stable(rd);                  // dummy for stable read
+  *pc = low;  __mdpad_barrier(); out.raw[0] = (uint8_t)~__mdpad_read_stable(rd); // TH=0
+  *pc = high; __mdpad_barrier(); out.raw[1] = (uint8_t)~__mdpad_read_stable(rd); // TH=1
+  *pc = low;  __mdpad_barrier(); out.raw[2] = (uint8_t)~__mdpad_read_stable(rd); // TH=0
+  *pc = high; __mdpad_barrier(); out.raw[3] = (uint8_t)~__mdpad_read_stable(rd); // TH=1
+  *pc = low;  __mdpad_barrier(); out.raw[4] = (uint8_t)~__mdpad_read_stable(rd); // TH=0
+  *pc = high; __mdpad_barrier(); out.raw[5] = (uint8_t)~__mdpad_read_stable(rd); // TH=1
+  *pc = high; __mdpad_barrier(); (void)__mdpad_read_stable(rd);                  // dummy for stable read
   return out;
 }
 
@@ -169,6 +169,9 @@ static inline mdpad_raw6_t mdpad_read6_raw(mdpad_port_t port) {
  */
 static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
   mdpad_raw6_t s = mdpad_read6_raw(port);
+#if 0
+  printf("\r0=%02X r1=%02X r2=%02X r3=%02X r4=%02X r5=%02X  /n", s.raw[0], s.raw[1], s.raw[2], s.raw[3], s.raw[4], s.raw[5]);
+#endif
   const uint8_t th1 = (uint8_t)(s.raw[1] | s.raw[3] | s.raw[5]);
   const uint8_t th0 = (uint8_t)(s.raw[0] | s.raw[2]);
   const uint8_t ext = s.raw[4];
