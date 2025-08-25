@@ -193,12 +193,15 @@ static inline int mdpad_guess_ext_index(const mdpad_raw6_t* s) {
  */
 static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
   mdpad_raw6_t s = mdpad_read6_raw(port); 
-  const uint8_t th1 = mdpad_th1_merge(&s);              /* dir+B/C  */
-  const uint8_t th0 = (uint8_t)(s.raw[0] | s.raw[2]);   /* A/START  */
-
   int ext_i = mdpad_guess_ext_index(&s);                /* ext      */
-  const uint8_t ext = (ext_i >= 0) ? s.raw[ext_i] : 0;
-
+  uint8_t th1 = 0; /* dir + BC */
+  if (ext_i != 1) th1 |= s.raw[1];
+  if (ext_i != 3) th1 |= s.raw[3];
+  if (ext_i != 5) th1 |= s.raw[5];
+  uint8_t th0 = 0; /* dir + AS */
+  if (ext_i != 0) th0 |= s.raw[0];
+  if (ext_i != 2) th0 |= s.raw[2];
+  const uint8_t ext = (ext_i >= 0) ? s.raw[ext_i] : 0; /* 6B */
   mdpad_state_t st = (mdpad_state_t){0};
 
   if (th1 & (1u << 0)) st.bits |= MDPAD_UP;
@@ -209,7 +212,7 @@ static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
   if (th1 & (1u << 5    )) st.bits |= MDPAD_B;    /* 3B */
   if (th1 & (1u << 6    )) st.bits |= MDPAD_C;
   if (th0 & (1u << 5    )) st.bits |= MDPAD_A;
-  if (th0 & (1u << 6)) st.bits |= MDPAD_START;
+  if (th0 & (1u << 6    )) st.bits |= MDPAD_START;
 
   if (ext & (1u << 0)) st.bits |= MDPAD_Z;        /* 6B */
   if (ext & (1u << 1)) st.bits |= MDPAD_Y;
