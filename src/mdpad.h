@@ -27,8 +27,18 @@ extern "C" {
 typedef enum { MDPAD_PORT_A = 0, MDPAD_PORT_B = 1 } mdpad_port_t;
 typedef enum { MDPAD_ATARI = 0, MDPAD_MD3 = 1, MDPAD_MD6 = 2 } mdpad_type_t;
 
-#define MDPAD_STABLE_READS      (4)
+#define MDPAD_STABLE_READS      (3)
 #define MDPAD_STABLE_MAX_ITERS (64)
+
+static inline uint16_t mdpad_irq_off(void){
+  uint16_t sr;
+  __asm__ volatile("move.w %%sr,%0; ori.w #0x0700,%%sr" : "=d"(sr) :: "cc","memory");
+  return sr;
+}
+
+static inline void mdpad_irq_restore(uint16_t sr){
+  __asm__ volatile("move.w %0,%%sr" :: "d"(sr) : "cc","memory");
+}
 
 static inline uint8_t __mdpad_read_stable(volatile uint8_t* rd) {
   uint8_t prev = *rd, cur;

@@ -30,15 +30,21 @@ void mdpad_bits_to_binary(uint16_t bits, char out[13]) {
 }
 int main(int argc, char* argv[]) {
   int usp = _iocs_b_super(0);
+  mdpad_port_t  port  = MDPAD_PORT_A;
+  mdpad_type_t  type  = mdpad_detect(port);
   printf("MD pad state / ESC:exit\n");
   printf("           MZYXSCBARLDU\n");
   printf("------------------------\n");
   while(!(_iocs_bitsns(0) & (1 << 1))){ // ESC: group0-bit1
     wait_vblank_start();
-    mdpad_port_t  port  = MDPAD_PORT_A;
-    mdpad_type_t  type  = mdpad_detect(port);
-    mdpad_state_t state = (type == MDPAD_MD6) ? mdpad_read6(port)
-                                              : mdpad_read3(port);
+    mdpad_state_t state;
+    if (type == MDPAD_MD6) {
+      uint16_t sr = mdpad_irq_off();
+      state = mdpad_read6(port);
+      mdpad_irq_restore(sr);
+    } else {
+      state = mdpad_read3(port);
+    }
     char bin[13];
     mdpad_bits_to_binary(state.bits, bin);
     printf("\r[%s][%s][%s]        ", PORT_STRING[port], PAD_STRING[(int)type], bin);
