@@ -171,6 +171,20 @@ static inline mdpad_raw6_t mdpad_read6_raw(mdpad_port_t port) {
   return out;
 }
 
+static inline uint8_t mdpad_th1_merge(const mdpad_raw6_t* s) {
+  return (uint8_t)(s->raw[1] | s->raw[3] | s->raw[5]);
+}
+
+static inline int mdpad_guess_ext_index(const mdpad_raw6_t* s) {
+  const uint8_t dir = s->raw[1] & 0x0F;       /* TH=1 direction*/
+  const int cand[] = {4, 5, 3, 2};            /* r4, r5->r3->r2 */
+  for (unsigned i = 0; i < sizeof(cand)/sizeof(cand[0]); ++i) {
+    const int k = cand[i];
+    if ((s->raw[k] & 0x0F) != dir) return k;  /* not direction = ext */
+  }
+  return -1;
+}
+
 /* ---- 6-button decoded read 
  * - U/D/L/R from TH=1 sample (raw[1])
  * - B,C from TH=1 (raw[1])
@@ -178,29 +192,31 @@ static inline mdpad_raw6_t mdpad_read6_raw(mdpad_port_t port) {
  * - X,Y,Z,MODE from the 3rd TH=0 (raw[4]) where D0..D3 are reused.
  */
 static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
-  mdpad_raw6_t s = mdpad_read6_raw(port);
-#if 0
-  printf("\r0=%02X r1=%02X r2=%02X r3=%02X r4=%02X r5=%02X  /n", s.raw[0], s.raw[1], s.raw[2], s.raw[3], s.raw[4], s.raw[5]);
-#endif
-  const uint8_t th1 = (uint8_t)(s.raw[1] | s.raw[3] | s.raw[5]);
-  const uint8_t th0 = (uint8_t)(s.raw[0] | s.raw[2]);
-  const uint8_t ext = s.raw[4];
+  mdpad_raw6_t s = mdpad_read6_raw(port); 
+  const uint8_t th1 = mdpad_th1_merge(&s);              /* dir+B/C  */
+  const uint8_t th0 = (uint8_t)(s.raw[0] | s.raw[2]);   /* A/START  */
+
+  int ext_i = mdpad_guess_ext_index(&s);                /* ext      */
+  const uint8_t ext = (ext_i >= 0) ? s.raw[ext_i] : 0;
+
   mdpad_state_t st = (mdpad_state_t){0};
+
   if (th1 & (1u << 0)) st.bits |= MDPAD_UP;
   if (th1 & (1u << 1)) st.bits |= MDPAD_DOWN;
   if (th1 & (1u << 2)) st.bits |= MDPAD_LEFT;
   if (th1 & (1u << 3)) st.bits |= MDPAD_RIGHT;
-  if (th1 & (1u << 5)) st.bits |= MDPAD_B; // 3B
-  if (th1 & (1u << 6)) st.bits |= MDPAD_C;
-  if (th0 & (1u << 5)) st.bits |= MDPAD_A;
+
+  if (th1 & (1u << 5    )) st.bits |= MDPAD_B;    /* 3B */
+  if (th1 & (1u << 6    )) st.bits |= MDPAD_C;
+  if (th0 & (1u << 5    )) st.bits |= MDPAD_A;
   if (th0 & (1u << 6)) st.bits |= MDPAD_START;
-  if (ext & (1u << 0)) st.bits |= MDPAD_X; // 6B
+
+  if (ext & (1u << 0)) st.bits |= MDPAD_Z;        /* 6B */
   if (ext & (1u << 1)) st.bits |= MDPAD_Y;
-  if (ext & (1u << 2)) st.bits |= MDPAD_Z;
+  if (ext & (1u << 2)) st.bits |= MDPAD_X;
   if (ext & (1u << 3)) st.bits |= MDPAD_MODE;
   return st;
 }
-
 
 /* ---- Convenience: read-any (detect once per call) ---- */
 static inline mdpad_state_t mdpad_read(mdpad_port_t port) {
