@@ -178,9 +178,21 @@ static inline uint8_t mdpad_th1_merge(const mdpad_raw6_t* s) {
 static inline int mdpad_is_id_nibble(uint8_t v) { return (v & 0x0F) == 0x0F; }
 
 static inline int mdpad_guess_ext_index(const mdpad_raw6_t* s) {
-  const uint8_t dir_ref = s->raw[1] & 0x0F;  /* TH=1 dir */
-  if (((s->raw[4] & 0x0F) != dir_ref) && !mdpad_is_id_nibble(s->raw[4])) return 4;
-  if (((s->raw[2] & 0x0F) != dir_ref) && !mdpad_is_id_nibble(s->raw[2])) return 2;
+  const uint8_t dir_ref = s->raw[1] & 0x0F;
+  const int cand_lo[] = {4, 2};
+  for (unsigned i=0;i<sizeof(cand_lo)/sizeof(cand_lo[0]);++i){
+    int k = cand_lo[i];
+    uint8_t n = s->raw[k] & 0x0F;
+    if (n != dir_ref && !mdpad_is_id_nibble(n)) return k;
+  }
+#if 1
+  const int cand_hi[] = {5, 3};
+  for (unsigned i=0;i<sizeof(cand_hi)/sizeof(cand_hi[0]);++i){
+    int k = cand_hi[i];
+    uint8_t n = s->raw[k] & 0x0F;
+    if (n != dir_ref && !mdpad_is_id_nibble(n)) return k;
+  }
+#endif
   return -1;
 }
 
