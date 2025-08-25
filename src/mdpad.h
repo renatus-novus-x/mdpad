@@ -175,13 +175,12 @@ static inline uint8_t mdpad_th1_merge(const mdpad_raw6_t* s) {
   return (uint8_t)(s->raw[1] | s->raw[3] | s->raw[5]);
 }
 
+static inline int mdpad_is_id_nibble(uint8_t v) { return (v & 0x0F) == 0x0F; }
+
 static inline int mdpad_guess_ext_index(const mdpad_raw6_t* s) {
-  const uint8_t dir = s->raw[1] & 0x0F;       /* TH=1 direction*/
-  const int cand[] = {4, 5, 3, 2};            /* r4, r5->r3->r2 */
-  for (unsigned i = 0; i < sizeof(cand)/sizeof(cand[0]); ++i) {
-    const int k = cand[i];
-    if ((s->raw[k] & 0x0F) != dir) return k;  /* not direction = ext */
-  }
+  const uint8_t dir_ref = s->raw[1] & 0x0F;  /* TH=1 dir */
+  if (((s->raw[4] & 0x0F) != dir_ref) && !mdpad_is_id_nibble(s->raw[4])) return 4;
+  if (((s->raw[2] & 0x0F) != dir_ref) && !mdpad_is_id_nibble(s->raw[2])) return 2;
   return -1;
 }
 
@@ -193,7 +192,7 @@ static inline int mdpad_guess_ext_index(const mdpad_raw6_t* s) {
  */
 static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
   mdpad_raw6_t s = mdpad_read6_raw(port); 
-  int ext_i = mdpad_guess_ext_index(&s);                /* ext      */
+  int ext_i = mdpad_guess_ext_index(&s);                /* ext idx  */
   uint8_t th1 = 0; /* dir + BC */
   if (ext_i != 1) th1 |= s.raw[1];
   if (ext_i != 3) th1 |= s.raw[3];
@@ -201,7 +200,11 @@ static inline mdpad_state_t mdpad_read6(mdpad_port_t port) {
   uint8_t th0 = 0; /* dir + AS */
   if (ext_i != 0) th0 |= s.raw[0];
   if (ext_i != 2) th0 |= s.raw[2];
-  const uint8_t ext = (ext_i >= 0) ? s.raw[ext_i] : 0; /* 6B */
+  uint8_t ext = 0;                                      /* ext      */
+  if (ext_i >= 0) {
+    uint8_t v = s.raw[ext_i] & 0x0F;
+    if (!mdpad_is_id_nibble(v)) ext = v;
+  }
   mdpad_state_t st = (mdpad_state_t){0};
 
   if (th1 & (1u << 0)) st.bits |= MDPAD_UP;
