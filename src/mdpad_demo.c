@@ -39,9 +39,7 @@ int main(int argc, char* argv[]) {
     wait_vblank_start();
     mdpad_state_t state;
     if (type == MDPAD_MD6) {
-      uint16_t sr = mdpad_irq_off();
       state = mdpad_read6(port);
-      mdpad_irq_restore(sr);
     } else {
       state = mdpad_read3(port);
     }
