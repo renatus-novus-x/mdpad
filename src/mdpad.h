@@ -94,11 +94,11 @@ static inline mdpad_type_t mdpad_detect(mdpad_port_t port) {
 
   uint8_t d;
 
-  *pc = low;  __mdpad_barrier(); d = __mdpad_read_stable(rd);
-  *pc = high; __mdpad_barrier(); d = __mdpad_read_stable(rd);
-  *pc = low;  __mdpad_barrier(); d = __mdpad_read_stable(rd);
-  *pc = high; __mdpad_barrier(); d = __mdpad_read_stable(rd);
-  *pc = low;  __mdpad_barrier(); d = __mdpad_read_stable(rd);  /* final */
+  *pc = low;  __mdpad_barrier(); d = *rd;
+  *pc = high; __mdpad_barrier(); d = *rd;
+  *pc = low;  __mdpad_barrier(); d = *rd;
+  *pc = high; __mdpad_barrier(); d = *rd;
+  *pc = low;  __mdpad_barrier(); d = *rd;  /* final */
 
   d ^= 0xFF;                 /* active-low -> active-high */
   uint8_t id = (uint8_t)(d & 0x0F);   /* use low nibble */
